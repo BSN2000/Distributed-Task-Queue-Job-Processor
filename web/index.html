@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Queue Dashboard</title>
+    <link rel="stylesheet" href="styles.css?v=5">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Job Queue Dashboard</h1>
+        </header>
+
+        <!-- Metrics Section -->
+        <section class="metrics-section">
+            <h2>Job Metrics</h2>
+            <div id="metricsContainer" class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Jobs</div>
+                    <div class="metric-value" id="metricTotalJobs">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Pending</div>
+                    <div class="metric-value status-pending" id="metricPending">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Running</div>
+                    <div class="metric-value status-running" id="metricRunning">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Completed</div>
+                    <div class="metric-value status-done" id="metricCompleted">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Failed</div>
+                    <div class="metric-value status-failed" id="metricFailed">-</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Retried</div>
+                    <div class="metric-value" id="metricRetried">-</div>
+                </div>
+                <div class="metric-card dlq-card">
+                    <div class="metric-label">Dead Letter Queue</div>
+                    <div class="metric-value status-failed" id="metricDLQ">-</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Job Submission Form -->
+        <section class="form-section">
+            <h2>Submit New Job</h2>
+            <form id="jobForm">
+                <div class="form-group">
+                    <label for="tenantId">Tenant ID:</label>
+                    <input type="text" id="tenantId" name="tenantId" required placeholder="e.g., tenant-1">
+                </div>
+                <div class="form-group">
+                    <label for="payload">Job Payload:</label>
+                    <textarea id="payload" name="payload" required placeholder="Enter job payload"></textarea>
+                </div>
+                <button type="submit">Submit Job</button>
+            </form>
+            <div id="formMessage" class="message"></div>
+        </section>
+
+        <!-- Jobs by Status -->
+        <section class="jobs-section">
+            <h2>Jobs by Status</h2>
+            
+            <div class="status-group">
+                <h3 class="status-pending">PENDING</h3>
+                <div id="pendingJobs" class="jobs-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-group">
+                <h3 class="status-running">RUNNING</h3>
+                <div id="runningJobs" class="jobs-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-group">
+                <h3 class="status-done">DONE</h3>
+                <div id="doneJobs" class="jobs-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+
+            <div class="status-group">
+                <h3 class="status-failed">FAILED</h3>
+                <div id="failedJobs" class="jobs-container">
+                    <p class="loading">Loading...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dead Letter Queue -->
+        <section class="dlq-section">
+            <h2>Dead Letter Queue</h2>
+            <div id="dlqJobs" class="jobs-container">
+                <p class="loading">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

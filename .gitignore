@@ -15,10 +15,10 @@ data/
 /tmp/
 /tmp/jobqueue_*.log
 
-# Test files
+# Test files (keep test files, only ignore test databases)
 test_*.go
 test_*.db
-*_test.go
+# *_test.go  # Commented out - we want to commit test files
 
 # IDE
 .vscode
