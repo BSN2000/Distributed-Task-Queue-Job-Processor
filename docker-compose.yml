@@ -1,0 +1,37 @@
+services:
+  api:
+    build: .
+    container_name: jobqueue-api
+    command: /app/api -db /app/data/jobs.db -port 8080
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/metrics"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build: .
+    container_name: jobqueue-worker
+    command: /app/worker -db /app/data/jobs.db
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  web:
+    build: .
+    container_name: jobqueue-web
+    command: /app/web-server -port 3000
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./web:/app/web
+    restart: unless-stopped
+    depends_on:
+      - api

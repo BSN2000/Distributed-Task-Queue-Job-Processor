@@ -1,0 +1,37 @@
+# Binaries
+api
+worker
+web
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+data/
+!data/.gitkeep
+
+# Logs
+*.log
+/tmp/
+/tmp/jobqueue_*.log
+
+# Test files
+test_*.go
+test_*.db
+*_test.go
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Temporary files
+docker-commands.txt

@@ -1,0 +1,915 @@
+{
+	"info": {
+		"_postman_id": "job-queue-api-collection",
+		"name": "Job Queue API",
+		"description": "Complete API collection for Job Queue System with all edge cases",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8081",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "tenant_id",
+			"value": "tenant-1",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Job Management",
+			"item": [
+				{
+					"name": "Create Job - Success",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Response has job ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"    pm.collectionVariables.set('job_id', jsonData.id);",
+									"});",
+									"pm.test(\"Job status is PENDING\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData.status).to.eql('PENDING');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\",\n    \"payload\": \"test job payload\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - With Max Retries",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\",\n    \"payload\": \"test job\",\n    \"max_retries\": 5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - With Idempotency Key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\",\n    \"payload\": \"idempotent job\",\n    \"idempotency_key\": \"unique-key-123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Duplicate Idempotency Key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\",\n    \"payload\": \"different payload\",\n    \"idempotency_key\": \"unique-key-123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Missing Tenant ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"payload\": \"test job\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Missing Payload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Invalid JSON",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"test\",\n    \"payload\": \"test\"\n    // invalid json\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Failing Job (payload=fail)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"{{tenant_id}}\",\n    \"payload\": \"fail\",\n    \"max_retries\": 2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Get Job by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has job ID\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('id');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}"]
+						}
+					}
+				},
+				{
+					"name": "Get Job - Not Found",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/non-existent-id-12345",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "non-existent-id-12345"]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - PENDING",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=PENDING",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "PENDING"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - RUNNING",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=RUNNING",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "RUNNING"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - DONE",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=DONE",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "DONE"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - FAILED",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=FAILED",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "FAILED"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - Missing Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - Invalid Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=INVALID",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "INVALID"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Dead Letter Queue",
+			"item": [
+				{
+					"name": "Get Dead Letter Queue",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response is array\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/dlq",
+							"host": ["{{base_url}}"],
+							"path": ["dlq"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Metrics",
+			"item": [
+				{
+					"name": "Get Metrics",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Response has metrics\", function () {",
+									"    var jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property('total_jobs');",
+									"    pm.expect(jsonData).to.have.property('completed_jobs');",
+									"    pm.expect(jsonData).to.have.property('failed_jobs');",
+									"    pm.expect(jsonData).to.have.property('retried_jobs');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/metrics",
+							"host": ["{{base_url}}"],
+							"path": ["metrics"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Rate Limiting",
+			"item": [
+				{
+					"name": "Rate Limit Test - Submit 12 Jobs",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// This will be run multiple times in a collection runner"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"if (pm.response.code === 429) {",
+									"    pm.test(\"Rate limit hit\", function () {",
+									"        pm.expect(pm.response.code).to.eql(429);",
+									"    });",
+									"} else {",
+									"    pm.test(\"Job created\", function () {",
+									"        pm.expect(pm.response.code).to.be.oneOf([201, 500]);",
+									"    });",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"rate-test-tenant\",\n    \"payload\": \"rate-test-{{$randomInt}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Edge Cases",
+			"item": [
+				{
+					"name": "Create Job - Empty Tenant ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"\",\n    \"payload\": \"test\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Empty Payload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Very Long Payload",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"{{$randomString}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Zero Max Retries",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"test\",\n    \"max_retries\": 0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Negative Max Retries",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"test\",\n    \"max_retries\": -1\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - Very Large Max Retries",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"test\",\n    \"max_retries\": 1000\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Get Job - Invalid UUID Format",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 404 or 400\", function () {",
+									"    pm.expect(pm.response.code).to.be.oneOf([404, 400]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/invalid-id-format",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "invalid-id-format"]
+						}
+					}
+				},
+				{
+					"name": "List Jobs - Special Characters in Status",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 400\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?status=PENDING<script>",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "PENDING<script>"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Create Job - SQL Injection Attempt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1'; DROP TABLE jobs; --\",\n    \"payload\": \"test\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "Create Job - XSS Attempt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"tenant_id\": \"tenant-1\",\n    \"payload\": \"<script>alert('xss')</script>\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "HTTP Methods",
+			"item": [
+				{
+					"name": "POST /jobs - Wrong Method (GET)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 405\", function () {",
+									"    pm.response.to.have.status(405);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				},
+				{
+					"name": "GET /jobs/{id} - Wrong Method (POST)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 405\", function () {",
+									"    pm.response.to.have.status(405);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/test-id",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "test-id"]
+						}
+					}
+				},
+				{
+					"name": "OPTIONS Request (CORS)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"CORS headers present\", function () {",
+									"    pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.exist;",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "OPTIONS",
+						"header": [
+							{
+								"key": "Origin",
+								"value": "http://localhost:3001"
+							},
+							{
+								"key": "Access-Control-Request-Method",
+								"value": "POST"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						}
+					}
+				}
+			]
+		}
+	]
+}

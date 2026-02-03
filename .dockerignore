@@ -1,0 +1,40 @@
+# Binaries (executable files, not the web directory)
+^api$
+^worker$
+^web$
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Logs
+*.log
+/tmp/
+
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+
+# Scripts
+start.sh
+stop.sh
+test.sh
+
+# Test files
+test_*.go
+test_*.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
