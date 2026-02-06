@@ -86,6 +86,25 @@ function showMessage(element, message, type) {
 // Load metrics
 async function loadMetrics() {
     try {
+        // FIRST: Load metrics from /metrics endpoint (includes accurate total from database)
+        // This endpoint returns total_jobs that includes DLQ jobs
+        let totalJobsFromAPI = null;
+        let retriedJobs = 0;
+        
+        try {
+            const metricsResponse = await fetch(`${API_BASE}/metrics`);
+            if (metricsResponse.ok) {
+                const metrics = await metricsResponse.json();
+                totalJobsFromAPI = metrics.total_jobs || 0;
+                retriedJobs = metrics.retried_jobs || 0;
+                // Set total jobs immediately from API (this includes DLQ)
+                document.getElementById('metricTotalJobs').textContent = totalJobsFromAPI;
+                document.getElementById('metricRetried').textContent = retriedJobs;
+            }
+        } catch (error) {
+            console.error('Error loading metrics endpoint:', error);
+        }
+
         // Load current status counts from API (shows current state)
         const statusCounts = {
             PENDING: 0,
@@ -117,35 +136,30 @@ async function loadMetrics() {
 
         await Promise.all(statusPromises);
 
-        // Calculate total jobs from all statuses (more accurate than in-memory metrics)
-        const totalJobs = statusCounts.PENDING + statusCounts.RUNNING + statusCounts.DONE + statusCounts.FAILED;
-        document.getElementById('metricTotalJobs').textContent = totalJobs;
-
-        // Load retried jobs from metrics (this is cumulative and tracked separately)
-        try {
-            const metricsResponse = await fetch(`${API_BASE}/metrics`);
-            if (metricsResponse.ok) {
-                const metrics = await metricsResponse.json();
-                document.getElementById('metricRetried').textContent = metrics.retried_jobs || 0;
-            } else {
-                document.getElementById('metricRetried').textContent = '0';
-            }
-        } catch (error) {
-            document.getElementById('metricRetried').textContent = '0';
-        }
-
         // Load DLQ count
+        let dlqCount = 0;
         try {
             const dlqResponse = await fetch(`${API_BASE}/dlq`);
             if (dlqResponse.ok) {
                 const dlqJobs = await dlqResponse.json();
-                const dlqCount = Array.isArray(dlqJobs) ? dlqJobs.length : 0;
+                dlqCount = Array.isArray(dlqJobs) ? dlqJobs.length : 0;
                 document.getElementById('metricDLQ').textContent = dlqCount;
             } else {
                 document.getElementById('metricDLQ').textContent = '0';
             }
         } catch (error) {
             document.getElementById('metricDLQ').textContent = '0';
+        }
+
+        // If metrics API didn't work, use fallback calculation
+        if (totalJobsFromAPI === null) {
+            const totalJobs = statusCounts.PENDING + statusCounts.RUNNING + statusCounts.DONE + statusCounts.FAILED + dlqCount;
+            document.getElementById('metricTotalJobs').textContent = totalJobs;
+        }
+        
+        // Set retried if not already set
+        if (retriedJobs === 0) {
+            document.getElementById('metricRetried').textContent = '0';
         }
     } catch (error) {
         // Silently fail - metrics will show "-" on error

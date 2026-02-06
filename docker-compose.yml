@@ -23,6 +23,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped 
+    deploy:
+      replicas: 3 
 
   web:
     build: .

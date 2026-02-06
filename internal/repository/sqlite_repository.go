@@ -567,3 +567,61 @@ func (r *SQLiteRepository) ListDeadLetterJobs(ctx context.Context) ([]*models.De
 
 	return dlqJobs, nil
 }
+
+// GetTotalJobsCount returns the total count of all jobs (including DLQ)
+func (r *SQLiteRepository) GetTotalJobsCount(ctx context.Context) (int, error) {
+	// Count jobs in jobs table
+	var jobsCount int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs").Scan(&jobsCount)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count jobs: %w", err)
+	}
+
+	// Count jobs in DLQ
+	var dlqCount int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dead_letter_jobs").Scan(&dlqCount)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count DLQ jobs: %w", err)
+	}
+
+	return jobsCount + dlqCount, nil
+}
+
+// GetCompletedJobsCount returns the count of completed (DONE) jobs
+func (r *SQLiteRepository) GetCompletedJobsCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE status = 'DONE'").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count completed jobs: %w", err)
+	}
+	return count, nil
+}
+
+// GetFailedJobsCount returns the count of failed jobs (FAILED status + DLQ)
+func (r *SQLiteRepository) GetFailedJobsCount(ctx context.Context) (int, error) {
+	// Count FAILED jobs
+	var failedCount int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM jobs WHERE status = 'FAILED'").Scan(&failedCount)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count failed jobs: %w", err)
+	}
+
+	// Count DLQ jobs
+	var dlqCount int
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dead_letter_jobs").Scan(&dlqCount)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count DLQ jobs: %w", err)
+	}
+
+	return failedCount + dlqCount, nil
+}
+
+// GetDeadLetterQueueCount returns the count of jobs in DLQ
+func (r *SQLiteRepository) GetDeadLetterQueueCount(ctx context.Context) (int, error) {
+	var count int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dead_letter_jobs").Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count DLQ jobs: %w", err)
+	}
+	return count, nil
+}

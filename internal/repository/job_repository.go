@@ -18,4 +18,8 @@ type JobRepository interface {
 	GetRunningJobsCountByTenant(ctx context.Context, tenantID string) (int, error)
 	MoveToDeadLetterQueue(ctx context.Context, job *models.Job, failureReason string) error
 	ListDeadLetterJobs(ctx context.Context) ([]*models.DeadLetterJob, error)
+	GetTotalJobsCount(ctx context.Context) (int, error)
+	GetCompletedJobsCount(ctx context.Context) (int, error)
+	GetFailedJobsCount(ctx context.Context) (int, error)
+	GetDeadLetterQueueCount(ctx context.Context) (int, error)
 }

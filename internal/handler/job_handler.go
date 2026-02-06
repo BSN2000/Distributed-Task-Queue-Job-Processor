@@ -16,13 +16,15 @@ import (
 type JobHandler struct {
 	jobService *service.JobService
 	metrics    *metrics.Metrics
+	repo       repository.JobRepository
 }
 
 // NewJobHandler creates a new job handler
-func NewJobHandler(jobService *service.JobService, metrics *metrics.Metrics) *JobHandler {
+func NewJobHandler(jobService *service.JobService, metrics *metrics.Metrics, repo repository.JobRepository) *JobHandler {
 	return &JobHandler{
 		jobService: jobService,
 		metrics:    metrics,
+		repo:       repo,
 	}
 }
 
@@ -197,10 +199,40 @@ func (h *JobHandler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	snapshot := h.metrics.GetSnapshot()
+	// Get actual counts from database (more accurate than in-memory metrics)
+	ctx := r.Context()
+
+	totalJobs, err := h.repo.GetTotalJobsCount(ctx)
+	if err != nil {
+		log.Printf("error getting total jobs count: %v", err)
+		totalJobs = 0
+	}
+
+	completedJobs, err := h.repo.GetCompletedJobsCount(ctx)
+	if err != nil {
+		log.Printf("error getting completed jobs count: %v", err)
+		completedJobs = 0
+	}
+
+	failedJobs, err := h.repo.GetFailedJobsCount(ctx)
+	if err != nil {
+		log.Printf("error getting failed jobs count: %v", err)
+		failedJobs = 0
+	}
+
+	// Get retried jobs from in-memory metrics (this is tracked separately)
+	inMemoryMetrics := h.metrics.GetSnapshot()
+	retriedJobs := inMemoryMetrics["retried_jobs"]
+
+	metrics := map[string]int64{
+		"total_jobs":     int64(totalJobs),
+		"completed_jobs": int64(completedJobs),
+		"failed_jobs":    int64(failedJobs),
+		"retried_jobs":   retriedJobs,
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(snapshot); err != nil {
+	if err := json.NewEncoder(w).Encode(metrics); err != nil {
 		log.Printf("error encoding response: %v", err)
 	}
 }
