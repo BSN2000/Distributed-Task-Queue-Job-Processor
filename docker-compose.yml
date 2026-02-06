@@ -16,13 +16,13 @@ services:
 
   worker:
     build: .
-    container_name: jobqueue-worker
+    # No container_name - allows scaling
     command: /app/worker -db /app/data/jobs.db
     volumes:
       - ./data:/app/data
     depends_on:
       - api
-    restart: unless-stopped
+    restart: unless-stopped 
 
   web:
     build: .

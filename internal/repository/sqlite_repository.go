@@ -90,10 +90,19 @@ func (r *SQLiteRepository) CreateJob(ctx context.Context, job *models.Job) error
 	job.CreatedAt = now
 	job.UpdatedAt = now
 
+	// Convert empty string to NULL for idempotency_key
+	// SQLite allows multiple NULLs in a UNIQUE constraint, but not multiple empty strings
+	var idempotencyKey interface{}
+	if job.IdempotencyKey == "" {
+		idempotencyKey = nil
+	} else {
+		idempotencyKey = job.IdempotencyKey
+	}
+
 	_, err := r.db.ExecContext(ctx, query,
 		job.ID,
 		job.TenantID,
-		job.IdempotencyKey,
+		idempotencyKey,
 		job.Payload,
 		job.Status,
 		job.MaxRetries,
@@ -106,8 +115,14 @@ func (r *SQLiteRepository) CreateJob(ctx context.Context, job *models.Job) error
 		// Check if it's a unique constraint violation (idempotency key conflict)
 		if errStr := err.Error(); errStr != "" {
 			// SQLite returns "UNIQUE constraint failed" for unique violations
-			if strings.Contains(errStr, "UNIQUE constraint failed") && job.IdempotencyKey != "" {
-				return &ErrDuplicateIdempotencyKey{TenantID: job.TenantID, IdempotencyKey: job.IdempotencyKey}
+			if strings.Contains(errStr, "UNIQUE constraint failed") {
+				// Only return duplicate error if idempotency_key was provided (not empty)
+				if job.IdempotencyKey != "" {
+					return &ErrDuplicateIdempotencyKey{TenantID: job.TenantID, IdempotencyKey: job.IdempotencyKey}
+				}
+				// If idempotency_key was empty, this shouldn't happen (NULLs are allowed multiple times)
+				// But handle it gracefully
+				return fmt.Errorf("failed to create job: unique constraint violation (unexpected)")
 			}
 		}
 		return fmt.Errorf("failed to create job: %w", err)
@@ -126,7 +141,6 @@ func (e *ErrDuplicateIdempotencyKey) Error() string {
 	return fmt.Sprintf("job with idempotency_key %s already exists for tenant %s", e.IdempotencyKey, e.TenantID)
 }
 
-
 // GetJobByID retrieves a job by ID
 func (r *SQLiteRepository) GetJobByID(ctx context.Context, id string) (*models.Job, error) {
 	query := `
@@ -137,13 +151,14 @@ func (r *SQLiteRepository) GetJobByID(ctx context.Context, id string) (*models.J
 	`
 
 	var job models.Job
+	var idempotencyKeyVal sql.NullString
 	var leasedAt, leaseExpiresAt sql.NullInt64
 	var createdAt, updatedAt int64
 
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&job.ID,
 		&job.TenantID,
-		&job.IdempotencyKey,
+		&idempotencyKeyVal,
 		&job.Payload,
 		&job.Status,
 		&job.MaxRetries,
@@ -159,6 +174,13 @@ func (r *SQLiteRepository) GetJobByID(ctx context.Context, id string) (*models.J
 			return nil, sql.ErrNoRows
 		}
 		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	// Handle NULL idempotency_key
+	if idempotencyKeyVal.Valid {
+		job.IdempotencyKey = idempotencyKeyVal.String
+	} else {
+		job.IdempotencyKey = ""
 	}
 
 	job.CreatedAt = time.Unix(createdAt, 0)
@@ -179,21 +201,37 @@ func (r *SQLiteRepository) GetJobByID(ctx context.Context, id string) (*models.J
 
 // GetJobByTenantAndIdempotencyKey retrieves a job by tenant ID and idempotency key
 func (r *SQLiteRepository) GetJobByTenantAndIdempotencyKey(ctx context.Context, tenantID, idempotencyKey string) (*models.Job, error) {
-	query := `
-		SELECT id, tenant_id, idempotency_key, payload, status, max_retries, retry_count,
-		       leased_at, lease_expires_at, created_at, updated_at
-		FROM jobs
-		WHERE tenant_id = ? AND idempotency_key = ?
-	`
+	// Handle NULL idempotency_key (empty string means no idempotency key)
+	var query string
+	var args []interface{}
+
+	if idempotencyKey == "" {
+		query = `
+			SELECT id, tenant_id, idempotency_key, payload, status, max_retries, retry_count,
+			       leased_at, lease_expires_at, created_at, updated_at
+			FROM jobs
+			WHERE tenant_id = ? AND idempotency_key IS NULL
+		`
+		args = []interface{}{tenantID}
+	} else {
+		query = `
+			SELECT id, tenant_id, idempotency_key, payload, status, max_retries, retry_count,
+			       leased_at, lease_expires_at, created_at, updated_at
+			FROM jobs
+			WHERE tenant_id = ? AND idempotency_key = ?
+		`
+		args = []interface{}{tenantID, idempotencyKey}
+	}
 
 	var job models.Job
+	var idempotencyKeyVal sql.NullString
 	var leasedAt, leaseExpiresAt sql.NullInt64
 	var createdAt, updatedAt int64
 
-	err := r.db.QueryRowContext(ctx, query, tenantID, idempotencyKey).Scan(
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
 		&job.ID,
 		&job.TenantID,
-		&job.IdempotencyKey,
+		&idempotencyKeyVal,
 		&job.Payload,
 		&job.Status,
 		&job.MaxRetries,
@@ -209,6 +247,13 @@ func (r *SQLiteRepository) GetJobByTenantAndIdempotencyKey(ctx context.Context, 
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+
+	// Handle NULL idempotency_key
+	if idempotencyKeyVal.Valid {
+		job.IdempotencyKey = idempotencyKeyVal.String
+	} else {
+		job.IdempotencyKey = ""
 	}
 
 	job.CreatedAt = time.Unix(createdAt, 0)
@@ -246,13 +291,14 @@ func (r *SQLiteRepository) ListJobsByStatus(ctx context.Context, status models.J
 	var jobs []*models.Job
 	for rows.Next() {
 		var job models.Job
+		var idempotencyKeyVal sql.NullString
 		var leasedAt, leaseExpiresAt sql.NullInt64
 		var createdAt, updatedAt int64
 
 		err := rows.Scan(
 			&job.ID,
 			&job.TenantID,
-			&job.IdempotencyKey,
+			&idempotencyKeyVal,
 			&job.Payload,
 			&job.Status,
 			&job.MaxRetries,
@@ -264,6 +310,13 @@ func (r *SQLiteRepository) ListJobsByStatus(ctx context.Context, status models.J
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan job: %w", err)
+		}
+
+		// Handle NULL idempotency_key
+		if idempotencyKeyVal.Valid {
+			job.IdempotencyKey = idempotencyKeyVal.String
+		} else {
+			job.IdempotencyKey = ""
 		}
 
 		job.CreatedAt = time.Unix(createdAt, 0)
@@ -315,13 +368,14 @@ func (r *SQLiteRepository) LeaseJob(ctx context.Context, leaseDuration time.Dura
 	`
 
 	var job models.Job
+	var idempotencyKeyVal sql.NullString
 	var leasedAt, leaseExpiresAt sql.NullInt64
 	var createdAt, updatedAt int64
 
 	err = tx.QueryRowContext(ctx, query, nowUnix).Scan(
 		&job.ID,
 		&job.TenantID,
-		&job.IdempotencyKey,
+		&idempotencyKeyVal,
 		&job.Payload,
 		&job.Status,
 		&job.MaxRetries,
@@ -337,6 +391,13 @@ func (r *SQLiteRepository) LeaseJob(ctx context.Context, leaseDuration time.Dura
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to find leasable job: %w", err)
+	}
+
+	// Handle NULL idempotency_key
+	if idempotencyKeyVal.Valid {
+		job.IdempotencyKey = idempotencyKeyVal.String
+	} else {
+		job.IdempotencyKey = ""
 	}
 
 	job.CreatedAt = time.Unix(createdAt, 0)

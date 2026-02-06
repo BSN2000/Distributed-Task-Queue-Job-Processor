@@ -2,8 +2,10 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"job-queue/internal/metrics"
 	"job-queue/internal/models"
+	"job-queue/internal/repository"
 	"job-queue/internal/service"
 	"log"
 	"net/http"
@@ -12,8 +14,8 @@ import (
 
 // JobHandler handles HTTP requests for jobs
 type JobHandler struct {
-	jobService   *service.JobService
-	metrics      *metrics.Metrics
+	jobService *service.JobService
+	metrics    *metrics.Metrics
 }
 
 // NewJobHandler creates a new job handler
@@ -49,12 +51,53 @@ func (h *JobHandler) CreateJob(w http.ResponseWriter, r *http.Request) {
 
 	job, err := h.jobService.CreateJob(r.Context(), &req)
 	if err != nil {
+		// Log full error for debugging
+		log.Printf("error creating job: %v (type: %T)", err, err)
+
+		// Check for specific error types first
 		if err == service.ErrRateLimitExceeded {
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
-		log.Printf("error creating job: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+
+		// Check for repository duplicate error type (unwrapped)
+		var dupErr *repository.ErrDuplicateIdempotencyKey
+		if errors.As(err, &dupErr) {
+			http.Error(w, "job creation failed: duplicate idempotency key", http.StatusConflict)
+			return
+		}
+
+		// Unwrap error to check inner errors
+		unwrappedErr := err
+		for unwrappedErr != nil {
+			if _, ok := unwrappedErr.(*repository.ErrDuplicateIdempotencyKey); ok {
+				http.Error(w, "job creation failed: duplicate idempotency key", http.StatusConflict)
+				return
+			}
+			unwrappedErr = errors.Unwrap(unwrappedErr)
+		}
+
+		// Provide more descriptive error messages based on error content
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "UNIQUE constraint") ||
+			strings.Contains(errMsg, "unique constraint") ||
+			strings.Contains(errMsg, "duplicate idempotency key") {
+			http.Error(w, "job creation failed: duplicate idempotency key", http.StatusConflict)
+		} else if strings.Contains(errMsg, "failed to create job") {
+			if strings.Contains(errMsg, "database") || strings.Contains(errMsg, "connection") {
+				http.Error(w, "job creation failed: database error", http.StatusInternalServerError)
+			} else {
+				// Return the actual error message for better debugging
+				http.Error(w, "job creation failed: "+errMsg, http.StatusInternalServerError)
+			}
+		} else if strings.Contains(errMsg, "failed to check idempotency") {
+			http.Error(w, "job creation failed: idempotency check error", http.StatusInternalServerError)
+		} else if strings.Contains(errMsg, "failed to get running jobs count") {
+			http.Error(w, "job creation failed: rate limit check error", http.StatusInternalServerError)
+		} else {
+			// Return the actual error message
+			http.Error(w, "job creation failed: "+errMsg, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -85,7 +128,14 @@ func (h *JobHandler) GetJob(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		log.Printf("error getting job: %v", err)
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+
+		// Provide more descriptive error messages
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "database") || strings.Contains(errMsg, "connection") {
+			http.Error(w, "failed to retrieve job: database error", http.StatusInternalServerError)
+		} else {
+			http.Error(w, "failed to retrieve job: "+errMsg, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -111,7 +161,7 @@ func (h *JobHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := models.JobStatus(statusStr)
-	if status != models.StatusPending && status != models.StatusRunning && 
+	if status != models.StatusPending && status != models.StatusRunning &&
 		status != models.StatusDone && status != models.StatusFailed {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("invalid status"))
@@ -121,8 +171,16 @@ func (h *JobHandler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	jobs, err := h.jobService.ListJobsByStatus(r.Context(), status)
 	if err != nil {
 		log.Printf("error listing jobs: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+
+		// Provide more descriptive error messages
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "database") || strings.Contains(errMsg, "connection") {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("failed to list jobs: database error"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("failed to list jobs: " + errMsg))
+		}
 		return
 	}
 
@@ -158,8 +216,16 @@ func (h *JobHandler) GetDeadLetterQueue(w http.ResponseWriter, r *http.Request) 
 	dlqJobs, err := h.jobService.ListDeadLetterJobs(r.Context())
 	if err != nil {
 		log.Printf("error listing dead letter jobs: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal server error"))
+
+		// Provide more descriptive error messages
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "database") || strings.Contains(errMsg, "connection") {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("failed to retrieve dead letter queue: database error"))
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("failed to retrieve dead letter queue: " + errMsg))
+		}
 		return
 	}
 
